@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="Keywords" content="js,audio recorder">
+    <meta name="Description" content="Recording audio with HTML 5 and JavaScript">
+    <meta name="viewport" content="initial-scale=1.0, width=device-width">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title> Audio Recorder</title>
+    <link rel="stylesheet" href="ranjan.css">
+    
+
+
+
+    <!-- for actvating jQuery -->
+    <script type="text/javascript" src="./js/jquery.min.js""></script>
+
+    <!-- A plugin for recording/exporting the output of Web Audio API nodes -->
+    <script src="./js/recorder.js"></script>
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+
+
+    <script>
+        jQuery(document).ready(function () {
+            var $ = jQuery;
+
+
+            var myRecorder = {
+                objects: {
+                    context: null,
+                    stream: null,
+                    recorder: null
+                },
+                init: function () {
+                    if (null === myRecorder.objects.context) {
+                        myRecorder.objects.context = new (
+                            window.AudioContext || window.webkitAudioContext
+                        );
+                    }
+                },
+                start: function () {
+
+                    var options = { audio: true, video: false, audioBitsPerSecond: 128000 };
+                    navigator.mediaDevices.getUserMedia(options).then(function (stream) {
+
+
+
+
+                        myRecorder.objects.stream = stream;
+
+                        myRecorder.objects.recorder = new Recorder(
+                            myRecorder.objects.context.createMediaStreamSource(stream),
+                            { numChannels: 1 }
+                        );
+                        myRecorder.objects.recorder.mimeType = 'audio/wav';
+                        myRecorder.objects.recorder.record();
+
+                    }).catch(function (err) {
+
+                        alert(err.name + ": " + err.message);
+                    });
+                },
+                stop: function (listObject) {
+                    if (null !== myRecorder.objects.stream) {
+                        myRecorder.objects.stream.getAudioTracks()[0].stop();
+                    }
+                    if (null !== myRecorder.objects.recorder) {
+                        myRecorder.objects.recorder.stop();
+
+                        // Validate object
+                        if (null !== listObject
+                            && 'object' === typeof listObject
+                            && listObject.length > 0) {
+                            myRecorder.objects.recorder.exportWAV(function (blob) {
+                                var url = (window.URL || window.webkitURL)
+                                    .createObjectURL(blob);
+                                var data = new FormData()
+                                var file = new File([blob], "audio/wav", { type: blob.type });
+                                data.append('file', file)
+
+
+                                fetch('http://127.0.0.1:5000/transcribe/', {
+                                    method: 'POST',
+                                    body: data
+
+                                }).then(response => response.json()
+                                ).then(json => {
+
+                                    console.log(json)
+                                    $("#driver").click(function () {
+
+                                        $("#text_con").append(json.result)
+
+
+                                    });
+
+
+
+
+                                });
+
+
+
+
+                                console.log("blob", blob);
+
+                                $('.textbox').show();
+
+
+                  
+
+
+
+
+
+
+
+                                // Prepare the playback
+                                var audioObject = $('<audio controls width="100" height="100"></audio>')
+                                    .attr('src', url);
+
+
+
+
+
+
+                                // Prepare the download link
+                                var downloadObject = $('<a><img src="../img/Downloads-icon.png" style="margin-top:2px" loading="lazy" width="75px" height="75px" alt="Downloads icon" title="Downloads icon"></a>')
+                                    .attr('href', url)
+                                    .attr('download', new Date().toUTCString() + '.wav');
+                                // Export the WAV file
+
+
+
+
+                                // Wrap everything in a row
+                                var holderObject = $('<div class="row"></div>')
+                                    .append(audioObject)
+                                    .append(downloadObject);
+
+                                //                                // Append to the list
+                                listObject.empty().append(holderObject);
+
+
+
+
+
+
+                            }, "audio/wav");
+                        }
+                    }
+                }
+            };
+
+            $('.textbox').hide();
+            // Prepare the recordings list
+            var listObject = $('[data-role="recordings"]');
+
+            if (navigator.permissions) {
+                navigator.permissions.query({ name: myRecorder })
+                    .then(function (PermissionStatus) {
+                        console.log('myRecorder permission state is ', PermissionStatus.state);
+
+
+                        PermissionStatus.onchange = function () {
+                            console.log('myRecorder permission is changed to', this.state);
+                        };
+                    });
+
+            }
+
+            Notification.requestPermission(function (result) {
+                if (result == "denied") {
+                    console.log('the permissions wasn\'t granted .allow a retry. ');
+                    return;
+                }
+                else if (result == "default") {
+                    console.log('the permission requested was dismissed. ');
+                    return;
+                }
+                console.log('Permission was granted for notifications. ');
+            })
+
+
+            // Prepare the record button
+            $('[data-role="controls"] > button').click(function () {
+                // Initialize the recorder
+                myRecorder.init();
+
+                // Get the button state 
+                var buttonState = !!$(this).attr('data-recording');
+
+                // Toggle
+                if (!buttonState) {
+                    $(this).attr('data-recording', 'true');
+                    $('[data-role="controls"] > button').html('Stop');
+                    myRecorder.start();
+                    $()
+                } else {
+                    $(this).attr('data-recording', '');
+                    $('[data-role="controls"] > button').html('Start');
+                    myRecorder.stop(listObject);
+
+
+
+                }
+            });
+
+
+
+
+        });
+
+
+
+
+    </script>
+
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="heading"> Transcribe Audio File </div>
+    </nav>
+    <div class="holder">
+
+        <div class="container">
+
+            <div data-role="controls">
+                <button class="btn">Start</button>
+            </div>
+            <div data-role="recordings">
+
+            </div>
+        </div>
+    
+    </div>
+    <div class="transcribe">
+        <h4>For transcribe the audio click the button click here ...</h4>
+        <textarea name="trancribe" id="text_con" cols="80" rows="30"></textarea>
+        <button id="driver">Click Here</button>
+    </div>
+    <div class="Details">
+
+        <div class="index-blocks  ">
+
+            <div class="About">
+                <div class="box">
+                    <h3>Free voice recorder</h3>
+                    <!-- <img src="../microphone.png" alt="" width="450px" height="450px" style="margin-right: 10pxpx;">
+                    <p> Lorem ipsum dolor sit amet consectetur adipisicing elit. Illo aliquam eos odio.</p> -->
+
+                </div>
+                <div class="box">
+                    <h3>Privacy</h3>
+                    <!-- <img src="../padlock.png" alt="" width="450px" height="450px" style="margin-top: 23px;">
+                    <p> Lorem ipsum dolor sit amet consectetur adipisicing elit. Illo aliquam eos odio.</p> -->
+                </div>
+
+
+                <div class="box">
+
+                    <h3>Online voice recorder</h3>
+                    <!-- <img src="../mic.png" alt="" width="450px" height="450px">
+                    <p> Lorem ipsum dolor sit amet consectetur adipisicing elit. Illo aliquam eos odio.</p> -->
+                </div>
+                <div class="box">
+
+                    <h3>Downloads</h3>
+                    <!-- <img src="../download-arrow.png" alt="" width="450px" height="450px">
+                    <p> Lorem ipsum dolor sit amet consectetur adipisicing elit. Illo aliquam eos odio.</p> -->
+                </div>
+
+            </div>
+
+
+            <div class="About">
+                <div class="box">
+                    <!-- <h3>Free voice recorder</h3> -->
+                    <img src="./img/microphone.png" alt="" width="225px" height="225px" style="margin-right: 10pxpx;">
+                    <p>Voice Recorder is completely free. No hidden payments, activation fees, or charges for extra
+                        features.</p>
+
+                </div>
+                <div class="box">
+                    <!-- <h3>Privacy</h3> -->
+                    <img src="./img/padlock.png" alt="" width="225px" height="225px" style="margin-top: 23px;">
+                    <p> We guarantee that our app is secure. Everything you record is accessible to you alone: nothing
+                        is uploaded to our servers for storage.</p>
+                </div>
+
+
+                <div class="box">
+
+                    <!-- <h3>Online voice recorder</h3> -->
+                    <img src="./img/mic.png" alt="" width="225px" height="225px">
+                    <p>
+                        Our Voice Recorder is a convenient and simple online tool that can be used right in your
+                        browser. It allows you to record your voice using a microphone and save it as an .WAV file.</p>
+                </div>
+                <div class="box">
+
+                    <!-- <h3>Downloads</h3> -->
+                    <img src="./img/download-arrow.png" alt="" width="225px" height="225px">
+                    <p> After the recording is complete, you can download it and use it in any way you want. You can
+                        also play the recording in the browser if you dont want to download it.</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="method"
+        style="/* max-width: 572px; */margin: auto;min-height: 450px;padding-top: 38px;margin-top: -265px;padding-left: 40px;margin-bottom: 130px;padding-right: 40px;">
+        <h2 style="font-size: 60px;color: rgb(36, 41, 46);font-weight: 400;text-align: center;padding-top: 20px;">
+            How to record audio from the microphone?</h2>
+        <p class="myPara">
+            1. Press the start button to start recording. After clicking the start button it convert into stop button
+        </p>
+        <p class="myPara">
+            2. The audio captured by the microphone will appear on the screen.</p>
+        <p class="myPara">
+            3. Press the stop button to stop recording.</p>
+        <p class="myPara">
+            4. To playback the voice recording, there is audio controls avilable.</p>
+        <p class="myPara">
+            5. To save the voice recording, press the Downloads icon button.</p>
+    </div>
+
+
+    <footer class="copyright">
+        <p>Abhishek Ranjan © copyright</p>
+    </footer>
+
+
+
+</body>
+
+
+</html>
